@@ -8,8 +8,8 @@ android {
 
     defaultConfig {
         applicationId "com.checkers.game"
-        minSdk 16
-        targetSdk 23
+        minSdk 24
+        targetSdk 28
         versionCode 1
         versionName "1.0"
 
