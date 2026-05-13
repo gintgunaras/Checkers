@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Checkers" parent="android:Theme.Holo.Light.DarkActionBar">
+        <item name="android:colorBackground">@color/background</item>
+    </style>
+</resources>
