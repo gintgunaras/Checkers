@@ -8,11 +8,11 @@ PLATFORM="$SDK/platforms/android-23"
 BUILD_TOOLS="$SDK/build-tools/debian"
 ANDROID_JAR="$PLATFORM/android.jar"
 APP_SRC="$PROJECT_DIR/app/src/main"
-PACKAGE="com.checkers.game"
 
 AAPT="$BUILD_TOOLS/aapt"
 DX="$BUILD_TOOLS/dx"
 ZIPALIGN="$BUILD_TOOLS/zipalign"
+APKSIGNER="$BUILD_TOOLS/apksigner"
 
 echo "=== Cleaning build dir ==="
 rm -rf "$BUILD_DIR"
@@ -20,7 +20,6 @@ mkdir -p "$BUILD_DIR/gen"
 mkdir -p "$BUILD_DIR/classes"
 mkdir -p "$BUILD_DIR/dex"
 mkdir -p "$BUILD_DIR/apk"
-mkdir -p "$BUILD_DIR/signed"
 
 echo "=== Generating R.java ==="
 $AAPT package -f -m \
@@ -30,10 +29,7 @@ $AAPT package -f -m \
     -I "$ANDROID_JAR"
 
 echo "=== Compiling Java sources ==="
-# Find all Java files
 JAVA_FILES=$(find "$APP_SRC/java" "$BUILD_DIR/gen" -name "*.java" 2>/dev/null | tr '\n' ' ')
-
-# We compile without support library - use plain Android SDK classes only
 javac -source 1.8 -target 1.8 \
     -classpath "$ANDROID_JAR" \
     -d "$BUILD_DIR/classes" \
@@ -59,31 +55,33 @@ echo "=== Zipalign ==="
 ALIGNED="$BUILD_DIR/apk/checkers-aligned.apk"
 $ZIPALIGN -f 4 "$UNALIGNED" "$ALIGNED"
 
-echo "=== Signing APK (debug key) ==="
-# Generate debug keystore if missing
+echo "=== Generating debug keystore ==="
 KEYSTORE="$BUILD_DIR/debug.keystore"
-if [ ! -f "$KEYSTORE" ]; then
-    keytool -genkey -v \
-        -keystore "$KEYSTORE" \
-        -alias androiddebugkey \
-        -keyalg RSA \
-        -keysize 2048 \
-        -validity 10000 \
-        -storepass android \
-        -keypass android \
-        -dname "CN=Android Debug,O=Android,C=US" \
-        2>&1
-fi
-
-SIGNED="$PROJECT_DIR/checkers-debug.apk"
-jarsigner -verbose \
-    -sigalg SHA256withRSA \
-    -digestalg SHA-256 \
+keytool -genkey -v \
     -keystore "$KEYSTORE" \
+    -alias androiddebugkey \
+    -keyalg RSA \
+    -keysize 2048 \
+    -validity 10000 \
     -storepass android \
     -keypass android \
-    -signedjar "$SIGNED" \
-    "$ALIGNED" androiddebugkey
+    -dname "CN=Android Debug,O=Android,C=US" \
+    2>&1
+
+echo "=== Signing APK with v1+v2 (apksigner) ==="
+SIGNED="$PROJECT_DIR/checkers-debug.apk"
+$APKSIGNER sign \
+    --ks "$KEYSTORE" \
+    --ks-pass pass:android \
+    --key-pass pass:android \
+    --ks-key-alias androiddebugkey \
+    --v1-signing-enabled true \
+    --v2-signing-enabled true \
+    --out "$SIGNED" \
+    "$ALIGNED"
+
+echo "=== Verifying signature ==="
+$APKSIGNER verify --verbose "$SIGNED" 2>&1
 
 echo ""
 echo "=== BUILD SUCCESSFUL ==="
